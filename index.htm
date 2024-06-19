@@ -1,0 +1,224 @@
+<!doctype html>
+<!-- COPYRIGHT 2024 KONA ARCTIC. SOME RIGHTS RESERVED. ABSOLUTELY NO WARRANTY! -->
+<html
+    style="
+	height : 100%;
+    "
+>
+    <head>
+        <meta charset="UTF-8">
+        <meta name=viewport content=width=device-width,initial-scale=1,user-scalable=0 />
+        <style>
+            input , button {
+                border-bottom-width : 0px;
+                border-left-width : 0px;
+                border-right-width : 0px;
+                border-top-width : 0px;
+                border-bottom-left-radius: 1em;
+                border-bottom-right-radius: 1em;
+                border-top-left-radius: 1em;
+                border-top-right-radius: 1em;
+                color : inherit;
+                height : 2em;
+                opacity : 0.75;
+                transition-duration : 1s;
+                transition-property : opacity;
+            }
+            input {
+                background : rgba( 255 , 255 , 255 , 0.15 );
+                outline-width : 0px;
+                padding-left : 0.5em;
+            }
+            button {
+                background : rgba( 255 , 255 , 255 , 0.15 );
+            }
+            button.circle {
+                width : 2em;
+            }
+            input:hover , input:focus , button:hover {
+                opacity : 1.0;
+            }
+        </style>
+        <script src=https://unpkg.com/qrcode-svg/lib/qrcode.js></script>
+        <script>
+            window.document.addEventListener( "DOMContentLoaded" , async function( event ){
+                try {
+                    var helper = "https://3ojdv6xpita4i66o6egzuggzwaacopt7.konaa.ca/";
+                    if ( ! window.location.hash ) {
+                        window.document.body.addEventListener( "click" , function( event ){
+                            window.document.body.requestFullscreen( );
+                        } , { } );
+                        let token = Math.random( );
+                        helper += "?" + token;
+                        console.log( window.location.href + "#" + token );
+                    	window.document.body.innerHTML =  new QRCode( {
+                    	    content : window.location.href + "#" + token ,
+                    	    height : 250 ,
+                    	    width : 250 ,
+                	        join : true ,
+                    	    padding : 0 ,
+                            color : "#ffffff",
+                            background : "#000000",
+                    	} ).svg( );
+                    	var embed = await import( "./embed.mjs" );
+                    	let player = null;
+                    	while ( true ) {
+                        	let respon = await fetch( helper );
+                        	if ( ! respon.ok )
+                        	    throw respon.status;
+                        	let reader = await respon.body.getReader( )
+                        	while ( true ) {
+                        	    let chunk = await reader.read( )
+                        	    if ( chunk.done )
+                        	        break;
+                        	    chunk = ( new TextDecoder( ) ).decode( chunk.value ).trim( );
+                        	    if ( chunk == "hide" )
+                        	        for ( let value of window.document.body.children )
+                        	            value.remove( );
+                        	    if ( chunk == "play" )
+                        	        player.play( );
+                        	    if ( chunk == "pause" )
+                        	        player.pause( );
+                        	    if ( chunk.match( "^seek -?[0-9]+" ) )
+                        	        player.seek( parseInt( chunk.match( "^seek (-?[0-9]+)" )[ 1 ] ) );
+                        	    if ( chunk.match( "^video " ) ) {
+                        	        for ( let value of window.document.body.children )
+                        	            value.remove( );
+                        	        chunk = chunk.match( "^video (.*)" )[ 1 ];
+                        	        player = null;
+                        	        for ( let value of embed.default )
+                        	            if ( chunk.match( value.match ) )
+                        	                player = new value( chunk );
+                        	        if ( ! player )
+                        	            throw "Internal error. Please report this bug.";
+                        	        window.document.body.append( player );
+                        	        //player.play( );
+                        	    }
+                        	}
+                        }
+                    } else {
+                        helper += "?" + window.location.hash.slice( 1 , undefined );
+                        window.document.querySelector( "body" ).append( window.document.querySelector( "template#input" ).content );
+                        window.document.querySelector( "body" ).append( window.document.querySelector( "template#control" ).content );
+                    	window.document.querySelector( "input" ).addEventListener( "blur" , async function( event ){
+                    	    if ( event.target.value ) {
+                        	    event.target.placeholder = event.target.value;
+                                let respon = await fetch( helper , {
+                                    method : "POST" ,
+                                    body : "video " + event.target.placeholder + "\r\n"
+                                } );
+                            	if ( ! respon.ok )
+                            	    throw respon.status;
+                        	    event.target.value = "";
+                        	}
+                    	} , { } );
+                    	for ( let value of [
+                    	    [ "back" , "seek -10" ] ,
+                    	    [ "fore" , "seek 10" ]
+                    	] )
+                        	window.document.querySelector( "button#" + value[ 0 ] ).addEventListener( "click" , async function( event ){
+                                let respon = await fetch( helper , {
+                                    method : "POST" ,
+                                    body : value[ 1 ] + "\r\n"
+                                } );
+                            	if ( ! respon.ok )
+                            	    throw respon.status;
+                        	} , { } );
+                        let state = "play";
+                    	window.document.querySelector( "button#play" ).addEventListener( "click" , async function( event ){
+                    	    state = {
+                    	        play : "pause" ,
+                    	        pause : "play" ,
+                    	    }[ state ];
+                            let respon = await fetch( helper , {
+                                method : "POST" ,
+                                body : state + "\r\n"
+                            } );
+                        	if ( ! respon.ok )
+                        	    throw respon.status;
+                    	} , { } );
+                    }
+                } catch( error ) {
+        	        for ( let value of window.document.body.children )
+        	            value.remove( );
+                    let errtxt = window.document.createElement( "pre" );
+                    window.document.body.append( errtxt );
+                    errtxt.style.fontSize = "2em";
+                    errtxt.textContent = "FATAL: " + error;
+                }
+            } , { } );
+        </script>
+    </head>
+    <body
+    	style="
+    	    align-content : center;
+    	    background : rgba( 0 , 0 , 0 , 1.0 );
+    	    color : rgba( 255 , 255 , 255 , 1.0 );
+            display : grid;
+            font-family : 'Comfortaa', 'Quicksand', sans-serif;
+            grid-template-columns : repeat( 3 , min-content );
+            grid-template-rows : repeat( 2 , min-content );
+            height : 100%;
+            justify-content : center;
+            justify-items: center;
+            margin-bottom : 0px;
+            margin-left : 0px;
+            margin-right : 0px;
+            margin-top : 0px;
+            row-gap : 0.5em;
+        "
+    >
+        <template
+            id=input
+        >
+            <input
+                style="
+                    display : inline;
+                    grid-column-start: 1;
+                    grid-column-end : 4;
+                "
+                placeholder="Paste video link here"
+                aria-lable="Paste video link here"
+            >
+        </template>
+        <template
+            id=control
+        >
+            <button
+                id=back
+                class=circle
+                style="
+                    display : inline;
+                    grid-column-end : 2;
+                "
+                aria-label="Seek back"
+            >
+                                ⯇
+            </button>
+            <!-- Im too lazy to implement play / pause buttons -->
+            <button
+                id=play
+                class=circle
+                style="
+                    display : inline;
+                    grid-column-end : 3;
+                "
+                aria-label="Play/pause"
+            >
+                ●
+            </button>
+            <button
+                id=fore
+                class=circle
+                style="
+                    display : inline;
+                    grid-column-end : 4;
+                "
+                aria-label="Seek fore"
+            >
+                                ⯈
+            </button>
+        </template>
+    </body>
+</html>
+
